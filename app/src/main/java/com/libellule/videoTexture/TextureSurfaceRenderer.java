@@ -1,181 +1,157 @@
 package com.libellule.videoTexture;
 
+import android.graphics.SurfaceTexture;
+import android.opengl.GLUtils;
+import android.util.Log;
+
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.egl.EGLContext;
 import javax.microedition.khronos.egl.EGLDisplay;
 import javax.microedition.khronos.egl.EGLSurface;
 
-import android.graphics.SurfaceTexture;
-import android.opengl.GLUtils;
-import android.util.Log;
+public abstract class TextureSurfaceRenderer implements Runnable {
+    private static final int EGL_OPENGL_ES2_BIT = 4;
+    private static final int EGL_CONTEXT_CLIENT_VERSION = 0x3098;
+    private static final String LOG_TAG = "SurfaceTest.GL";
+    protected final SurfaceTexture texture;
+    protected int width;
+    protected int height;
+    private EGL10 egl;
+    private EGLDisplay eglDisplay;
+    private EGLContext eglContext;
+    private EGLSurface eglSurface;
+    private boolean running;
+    private long lastFpsOutput = 0;
+    private int frames;
 
-public abstract class TextureSurfaceRenderer implements Runnable
-{
-	private static final int EGL_OPENGL_ES2_BIT = 4;
-	private static final int EGL_CONTEXT_CLIENT_VERSION = 0x3098;
-	private static final String LOG_TAG = "SurfaceTest.GL";
-	protected final SurfaceTexture texture;
-	private EGL10 egl;
-	private EGLDisplay eglDisplay;
-	private EGLContext eglContext;
-	private EGLSurface eglSurface;
+    public TextureSurfaceRenderer(SurfaceTexture texture, int width, int height) {
+        this.texture = texture;
+        this.width = width;
+        this.height = height;
+        this.running = true;
+        Thread thrd = new Thread(this);
+        thrd.start();
+    }
 
-	protected int width;
-	protected int height;
-	private boolean running;
+    @Override
+    public void run() {
+        initGL();
+        initGLComponents();
+        Log.d(LOG_TAG, "OpenGL init OK.");
 
-	public TextureSurfaceRenderer(SurfaceTexture texture, int width, int height)
-	{
-		this.texture = texture;
-		this.width = width;
-		this.height = height;
-		this.running = true;
-		Thread thrd = new Thread(this);
-		thrd.start();
-	}
+        while (running) {
+            long loopStart = System.currentTimeMillis();
+            pingFps();
 
-	@Override
-	public void run()
-	{
-		initGL();
-		initGLComponents();
-		Log.d(LOG_TAG, "OpenGL init OK.");
+            if (draw()) {
+                egl.eglSwapBuffers(eglDisplay, eglSurface);
+            }
 
-		while (running)
-		{
-			long loopStart = System.currentTimeMillis();
-			pingFps();
+            long waitDelta = 16 - (System.currentTimeMillis() - loopStart); // Targeting 60 fps, no need for faster
+            if (waitDelta > 0) {
+                try {
+                    Thread.sleep(waitDelta);
+                } catch (InterruptedException e) {
+                    continue;
+                }
+            }
+        }
 
-			if (draw())
-			{
-				egl.eglSwapBuffers(eglDisplay, eglSurface);
-			}
+        deinitGLComponents();
+        deinitGL();
+    }
 
-			long waitDelta = 16 - (System.currentTimeMillis() - loopStart); // Targeting 60 fps, no need for faster
-			if (waitDelta > 0)
-			{
-				try
-				{
-					Thread.sleep(waitDelta);
-				}
-				catch (InterruptedException e)
-				{
-					continue;
-				}
-			}
-		}
+    /**
+     * Main draw function, subclass this and add custom drawing code here. The rendering thread will attempt to limit FPS to 60 to keep CPU usage low.
+     */
+    protected abstract boolean draw();
 
-		deinitGLComponents();
-		deinitGL();
-	}
+    /**
+     * OpenGL component initialization funcion. This is called after OpenGL context has been initialized on the rendering thread. Subclass this and initialize shaders / textures / other GL related components here.
+     */
+    protected abstract void initGLComponents();
 
-	/**
-	 * Main draw function, subclass this and add custom drawing code here. The rendering thread will attempt to limit FPS to 60 to keep CPU usage low.
-	 */
-	protected abstract boolean draw();
+    protected abstract void deinitGLComponents();
 
-	/**
-	 * OpenGL component initialization funcion. This is called after OpenGL context has been initialized on the rendering thread. Subclass this and initialize shaders / textures / other GL related components here.
-	 */
-	protected abstract void initGLComponents();
+    private void pingFps() {
+        if (lastFpsOutput == 0)
+            lastFpsOutput = System.currentTimeMillis();
 
-	protected abstract void deinitGLComponents();
+        frames++;
 
-	private long lastFpsOutput = 0;
-	private int frames;
+        if (System.currentTimeMillis() - lastFpsOutput > 1000) {
+            Log.d(LOG_TAG, "FPS: " + frames);
+            lastFpsOutput = System.currentTimeMillis();
+            frames = 0;
+        }
+    }
 
-	private void pingFps()
-	{
-		if (lastFpsOutput == 0)
-			lastFpsOutput = System.currentTimeMillis();
+    /**
+     * Call when activity pauses. This stops the rendering thread and deinitializes OpenGL.
+     */
+    public void onPause() {
+        running = false;
+    }
 
-		frames++;
+    private void initGL() {
+        egl = (EGL10) EGLContext.getEGL();
+        eglDisplay = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
 
-		if (System.currentTimeMillis() - lastFpsOutput > 1000)
-		{
-			Log.d(LOG_TAG, "FPS: " + frames);
-			lastFpsOutput = System.currentTimeMillis();
-			frames = 0;
-		}
-	}
+        int[] version = new int[2];
+        egl.eglInitialize(eglDisplay, version);
 
-	/**
-	 * Call when activity pauses. This stops the rendering thread and deinitializes OpenGL.
-	 */
-	public void onPause()
-	{
-		running = false;
-	}
+        EGLConfig eglConfig = chooseEglConfig();
+        eglContext = createContext(egl, eglDisplay, eglConfig);
 
-	private void initGL()
-	{
-		egl = (EGL10) EGLContext.getEGL();
-		eglDisplay = egl.eglGetDisplay(EGL10.EGL_DEFAULT_DISPLAY);
+        eglSurface = egl.eglCreateWindowSurface(eglDisplay, eglConfig, texture, null);
 
-		int[] version = new int[2];
-		egl.eglInitialize(eglDisplay, version);
+        if (eglSurface == null || eglSurface == EGL10.EGL_NO_SURFACE) {
+            throw new RuntimeException("GL Error: " + GLUtils.getEGLErrorString(egl.eglGetError()));
+        }
 
-		EGLConfig eglConfig = chooseEglConfig();
-		eglContext = createContext(egl, eglDisplay, eglConfig);
+        if (!egl.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+            throw new RuntimeException("GL Make current error: " + GLUtils.getEGLErrorString(egl.eglGetError()));
+        }
+    }
 
-		eglSurface = egl.eglCreateWindowSurface(eglDisplay, eglConfig, texture, null);
+    private void deinitGL() {
+        egl.eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT);
+        egl.eglDestroySurface(eglDisplay, eglSurface);
+        egl.eglDestroyContext(eglDisplay, eglContext);
+        egl.eglTerminate(eglDisplay);
+        Log.d(LOG_TAG, "OpenGL deinit OK.");
+    }
 
-		if (eglSurface == null || eglSurface == EGL10.EGL_NO_SURFACE)
-		{
-			throw new RuntimeException("GL Error: " + GLUtils.getEGLErrorString(egl.eglGetError()));
-		}
+    private EGLContext createContext(EGL10 egl, EGLDisplay eglDisplay, EGLConfig eglConfig) {
+        int[] attribList =
+                {EGL_CONTEXT_CLIENT_VERSION, 2, EGL10.EGL_NONE};
+        return egl.eglCreateContext(eglDisplay, eglConfig, EGL10.EGL_NO_CONTEXT, attribList);
+    }
 
-		if (!egl.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext))
-		{
-			throw new RuntimeException("GL Make current error: " + GLUtils.getEGLErrorString(egl.eglGetError()));
-		}
-	}
+    private EGLConfig chooseEglConfig() {
+        int[] configsCount = new int[1];
+        EGLConfig[] configs = new EGLConfig[1];
+        int[] configSpec = getConfig();
 
-	private void deinitGL()
-	{
-		egl.eglMakeCurrent(eglDisplay, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_SURFACE, EGL10.EGL_NO_CONTEXT);
-		egl.eglDestroySurface(eglDisplay, eglSurface);
-		egl.eglDestroyContext(eglDisplay, eglContext);
-		egl.eglTerminate(eglDisplay);
-		Log.d(LOG_TAG, "OpenGL deinit OK.");
-	}
+        if (!egl.eglChooseConfig(eglDisplay, configSpec, configs, 1, configsCount)) {
+            throw new IllegalArgumentException("Failed to choose config: " + GLUtils.getEGLErrorString(egl.eglGetError()));
+        }
+        else if (configsCount[0] > 0) {
+            return configs[0];
+        }
 
-	private EGLContext createContext(EGL10 egl, EGLDisplay eglDisplay, EGLConfig eglConfig)
-	{
-		int[] attribList =
-		{ EGL_CONTEXT_CLIENT_VERSION, 2, EGL10.EGL_NONE };
-		return egl.eglCreateContext(eglDisplay, eglConfig, EGL10.EGL_NO_CONTEXT, attribList);
-	}
+        return null;
+    }
 
-	private EGLConfig chooseEglConfig()
-	{
-		int[] configsCount = new int[1];
-		EGLConfig[] configs = new EGLConfig[1];
-		int[] configSpec = getConfig();
+    private int[] getConfig() {
+        return new int[]
+                {EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_ALPHA_SIZE, 8, EGL10.EGL_DEPTH_SIZE, 0, EGL10.EGL_STENCIL_SIZE, 0, EGL10.EGL_NONE};
+    }
 
-		if (!egl.eglChooseConfig(eglDisplay, configSpec, configs, 1, configsCount))
-		{
-			throw new IllegalArgumentException("Failed to choose config: " + GLUtils.getEGLErrorString(egl.eglGetError()));
-		}
-		else if (configsCount[0] > 0)
-		{
-			return configs[0];
-		}
-
-		return null;
-	}
-
-	private int[] getConfig()
-	{
-		return new int[]
-		{ EGL10.EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL10.EGL_RED_SIZE, 8, EGL10.EGL_GREEN_SIZE, 8, EGL10.EGL_BLUE_SIZE, 8, EGL10.EGL_ALPHA_SIZE, 8, EGL10.EGL_DEPTH_SIZE, 0, EGL10.EGL_STENCIL_SIZE, 0, EGL10.EGL_NONE };
-	}
-
-	@Override
-	protected void finalize() throws Throwable
-	{
-		super.finalize();
-		running = false;
-	}
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        running = false;
+    }
 }
