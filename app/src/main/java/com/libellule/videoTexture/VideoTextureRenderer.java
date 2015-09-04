@@ -1,4 +1,4 @@
-package videoTexture;
+package com.libellule.videoTexture;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

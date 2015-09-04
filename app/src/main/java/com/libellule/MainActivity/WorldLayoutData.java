@@ -1,4 +1,4 @@
-package com.example.libellule;
+package com.libellule.MainActivity;
 
 public final class WorldLayoutData {
 	public static final float[] CUBE_COORDS = new float[] {

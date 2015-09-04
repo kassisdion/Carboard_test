@@ -1,4 +1,4 @@
-package videoTexture;
+package com.libellule.videoTexture;
 
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
@@ -6,6 +6,7 @@ import javax.microedition.khronos.egl.EGLContext;
 import javax.microedition.khronos.egl.EGLDisplay;
 import javax.microedition.khronos.egl.EGLSurface;
 
+import android.graphics.SurfaceTexture;
 import android.opengl.GLUtils;
 import android.util.Log;
 

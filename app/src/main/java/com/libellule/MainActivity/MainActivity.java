@@ -1,4 +1,4 @@
-package com.example.libellule;
+package com.libellule.MainActivity;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,6 +20,7 @@ import com.google.vrtoolkit.cardboard.CardboardView;
 import com.google.vrtoolkit.cardboard.EyeTransform;
 import com.google.vrtoolkit.cardboard.HeadTransform;
 import com.google.vrtoolkit.cardboard.Viewport;
+import com.libellule.R;
 
 /**
  * A Cardboard sample application.

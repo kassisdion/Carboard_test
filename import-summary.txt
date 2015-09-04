@@ -235,9 +235,9 @@ so manually move them:
 * app/src/main/java/com/example/libellule/
 * app/src/main/java/com/example/libellule/MainActivity.java
 * app/src/main/java/com/example/libellule/WorldLayoutData.java
-* app/src/main/java/videoTexture/
-* app/src/main/java/videoTexture/TextureSurfaceRenderer.java
-* app/src/main/java/videoTexture/VideoTextureRenderer.java
+* app/src/main/java/com.libellule.videoTexture/
+* app/src/main/java/com.libellule.videoTexture/TextureSurfaceRenderer.java
+* app/src/main/java/com.libellule.videoTexture/VideoTextureRenderer.java
 * app/src/main/res/
 * app/src/main/res/drawable-hdpi/
 * app/src/main/res/drawable-hdpi/ic_launcher.png
